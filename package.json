@@ -11,12 +11,17 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["error", "handler", "nodejs", "express"],
+  "keywords": [
+    "error",
+    "handler",
+    "nodejs",
+    "express"
+  ],
   "author": "Benson Osei Mensah",
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bensonOsei/errorty.git"
+    "url": "git+https://github.com/bensonOsei/errorty.git"
   },
   "files": [
     "dist/**/*"
