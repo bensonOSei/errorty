@@ -1,0 +1,39 @@
+# Source
+src
+
+# Tests
+test
+coverage
+
+# Build tools
+.travis.yml
+.jenkins.yml
+.codeclimate.yml
+
+# Linters
+.eslintrc
+.eslintignore
+.prettierrc
+.prettierignore
+
+# Editor settings
+.vscode
+.idea
+
+# Git
+.git
+.gitignore
+
+# Docs
+docs
+*.md
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

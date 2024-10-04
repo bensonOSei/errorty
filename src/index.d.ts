@@ -1,1 +1,0 @@
-type ResponseStatusType = "success" | "error";

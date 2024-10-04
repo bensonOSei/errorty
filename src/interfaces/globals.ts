@@ -1,7 +1,10 @@
+import { NextFunction, Request, Response } from "express";
+import { HttpError } from "../errors/HttpError";
+
 export interface ExpressMiddleware {
-  (req: any, res: any, next: any): void;
+  (req: Request, res: Response, next: NextFunction): void;
 }
 
 export interface ErrorHandlerMiddleware {
-  (err: any, req: any, res: any, next: any): void;
+  (err: HttpError, req: Request, res: Response, next?: NextFunction): void;
 }
