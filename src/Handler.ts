@@ -1,4 +1,4 @@
-import { Request, Response as ExpressResponse, NextFunction } from 'express';
+import { Request, Response as ExpressResponse, NextFunction } from "express";
 import { HttpStatusCodes } from "./enums/HttpStatusCodes";
 import { HttpError } from "./errors/HttpError";
 import { Config } from "./Config";
@@ -7,17 +7,54 @@ import { Response } from "./responses/Response";
 
 export class ErrorHandler {
   private static config: Config;
+  private static initialized: boolean = false;
+  private static initPromise: Promise<void> | null = null;
 
   public static async initialize(): Promise<void> {
-    ErrorHandler.config = await Config.getInstance();
+    if (ErrorHandler.initialized) return;
+    if (ErrorHandler.initPromise) return ErrorHandler.initPromise;
+
+    ErrorHandler.initPromise = ErrorHandler.performInit();
+    await ErrorHandler.initPromise;
+    ErrorHandler.initialized = true;
+  }
+
+  public static initializeSync(errortyConfig?: ErrortyConfig): void {
+    if (ErrorHandler.initialized) return;
+    ErrorHandler.config = Config.getInstance();
+    ErrorHandler.config.initSync(errortyConfig || {});
+    ErrorHandler.initialized = true;
+  }
+
+  private static async performInit(
+    errortyConfig?: ErrortyConfig
+  ): Promise<void> {
+    ErrorHandler.config = Config.getInstance();
+    if (errortyConfig) {
+      await ErrorHandler.config.init(errortyConfig);
+    } else
+      await ErrorHandler.config.init({
+        // Add your async config options here
+      });
+  }
+
+  public static isInitialized(): boolean {
+    return ErrorHandler.initialized;
   }
 
   public static handleError = (
     err: Error,
     req: Request,
     res: ExpressResponse,
-    next: NextFunction,
+    next: NextFunction
   ): void => {
+    if (!ErrorHandler.initialized) {
+      console.error(
+        "ErrorHandler not initialized. Initializing synchronously..."
+      );
+      ErrorHandler.initializeSync();
+    }
+
     const logger = ErrorHandler.config.getLogger();
     const isProduction = SystemUtils.isProduction();
 
@@ -25,21 +62,26 @@ export class ErrorHandler {
     if (err instanceof HttpError) {
       httpError = err;
     } else {
-      const ErrorClass = ErrorHandler.config.getErrorClass(err.name) || 
-                         ErrorHandler.config.getErrorClass('HttpInternalServerError');
-      
+      const ErrorClass =
+        ErrorHandler.config.getErrorClass(err.name) ||
+        ErrorHandler.config.getErrorClass("HttpInternalServerError");
+
       if (ErrorClass) {
         httpError = new ErrorClass(err.message);
       } else {
-        // Fallback to a generic HttpError if no matching error class is found
-        httpError = new HttpError(err.message, HttpStatusCodes.INTERNAL_SERVER_ERROR);
-        logger.warn(`No error class found for "${err.name}". Using generic HttpError.`);
+        httpError = new HttpError(
+          err.message,
+          HttpStatusCodes.INTERNAL_SERVER_ERROR
+        );
+        logger.warn(
+          `No error class found for "${err.name}". Using generic HttpError.`
+        );
       }
     }
 
     const statusCode = httpError.statusCode;
     let message = httpError.message;
-    
+
     if (isProduction && statusCode === HttpStatusCodes.INTERNAL_SERVER_ERROR) {
       message = "Internal Server Error";
     }
@@ -69,25 +111,29 @@ export class ErrorHandler {
   };
 
   private static sendErrorResponse(
-    res: ExpressResponse, 
+    res: ExpressResponse,
     errorData: Record<string, unknown>,
-    message: string, 
+    message: string,
     statusCode: number
   ): void {
     const ErrortyResponseType = ErrorHandler.config.getErrortyResponseType();
     const errorResponse = Response.error(errorData, message, statusCode);
-    console.log({errorResponse});
-    if (ErrortyResponseType === 'json') {
+    console.log({ errorResponse });
+    if (ErrortyResponseType === "json") {
       res.status(statusCode).json(errorResponse);
     } else {
-      res.status(statusCode).type('text/plain').send(`Error: ${message}`);
+      res.status(statusCode).type("text/plain").send(`Error: ${message}`);
     }
   }
 
-  public static handleNotFound = (
-    req: Request,
-    res: ExpressResponse,
-  ): void => {
+  public static handleNotFound = (req: Request, res: ExpressResponse): void => {
+    if (!ErrorHandler.initialized) {
+      console.error(
+        "ErrorHandler not initialized. Initializing synchronously..."
+      );
+      ErrorHandler.initializeSync();
+    }
+
     const message = `Cannot ${req.method} ${req.path}`;
     const logger = ErrorHandler.config.getLogger();
     logger.warn({
@@ -95,14 +141,26 @@ export class ErrorHandler {
       path: req.path,
       method: req.method,
     });
-    ErrorHandler.sendErrorResponse(res, { path: req.path }, message, HttpStatusCodes.NOT_FOUND);
+    ErrorHandler.sendErrorResponse(
+      res,
+      { path: req.path },
+      message,
+      HttpStatusCodes.NOT_FOUND
+    );
   };
 
   public static initializeUnhandledExceptionHandlers(): void {
+    if (!ErrorHandler.initialized) {
+      console.error(
+        "ErrorHandler not initialized. Initializing synchronously..."
+      );
+      ErrorHandler.initializeSync();
+    }
+
     const logger = ErrorHandler.config.getLogger();
-    
-    process.on('uncaughtException', (err: Error) => {
-      logger.fatal({
+
+    process.on("uncaughtException", (err: Error) => {
+      logger.error({
         message: "Uncaught Exception",
         error: err.message,
         stack: err.stack,
@@ -110,14 +168,17 @@ export class ErrorHandler {
       process.exit(1);
     });
 
-    process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
-      logger.fatal({
-        message: "Unhandled Rejection",
-        reason: ErrorHandler.formatRejectionReason(reason),
-        promise: `Promise: ${promise}`,
-      });
-      process.exit(1);
-    });
+    process.on(
+      "unhandledRejection",
+      (reason: unknown, promise: Promise<unknown>) => {
+        logger.error({
+          message: "Unhandled Rejection",
+          reason: ErrorHandler.formatRejectionReason(reason),
+          promise: `Promise: ${promise}`,
+        });
+        process.exit(1);
+      }
+    );
   }
 
   private static formatRejectionReason(reason: unknown): string {
@@ -127,34 +188,3 @@ export class ErrorHandler {
     return String(reason);
   }
 }
-
-// Usage example:
-// import { ErrorHandler, Config, ErrortyConfig } from './your-error-package';
-// import express from 'express';
-// 
-// async function setupApp() {
-//   const customConfig: ErrortyConfig = {
-//     showStackTrace: process.env.NODE_ENV !== 'production',
-//     logRequestDetails: true,
-//     ErrortyResponseType: 'json',
-//     // ... other config options ...
-//   };
-// 
-//   await Config.configure(customConfig);
-//   await ErrorHandler.initialize();
-// 
-//   const app = express();
-//   
-//   // ... your routes and other middleware ...
-// 
-//   app.use(ErrorHandler.handleNotFound);
-//   app.use(ErrorHandler.handleError);
-// 
-//   ErrorHandler.initializeUnhandledExceptionHandlers();
-// 
-//   return app;
-// }
-// 
-// setupApp().then(app => {
-//   app.listen(3000, () => console.log('Server started'));
-// });

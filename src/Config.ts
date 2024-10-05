@@ -17,6 +17,8 @@ export class Config {
     private errorMap: Map<string, ErrorConstructor>;
     private errorOverrides: ErrorOverrideConfig | undefined;
     private ErrortyResponseType: ErrortyErrorResponseType;
+    private initialized: boolean = false;
+    private initPromise: Promise<void> | null = null;
   
     private constructor() {
       this.logger = new Logger();
@@ -26,8 +28,75 @@ export class Config {
       this.ErrortyResponseType = 'json';
     }
   
+    public static getInstance(): Config {
+      if (!Config.instance) {
+        Config.instance = new Config();
+      }
+      return Config.instance;
+    }
+
+    public async init(config: ErrortyConfig): Promise<void> {
+      if (this.initialized) return;
+      if (this.initPromise) return this.initPromise;
+
+      this.initPromise = this.performInit(config);
+      await this.initPromise;
+      this.initialized = true;
+    }
+
+    public initSync(config: ErrortyConfig): void {
+      if (this.initialized) return;
+      this.applyConfig(config);
+      this.initializeErrorMapSync();
+      this.initialized = true;
+    }
+
+    private async performInit(config: ErrortyConfig): Promise<void> {
+      this.applyConfig(config);
+      await this.initializeErrorMap();
+    }
+
+    private applyConfig(config: ErrortyConfig): void {
+      if (config.logger !== undefined) {
+        this.logger = config.logger || new Logger();
+      }
+      if (config.showStackTrace !== undefined) {
+        this.showStackTrace = config.showStackTrace;
+      }
+      if (config.logRequestDetails !== undefined) {
+        this.logRequestDetails = config.logRequestDetails;
+      }
+      if (config.ErrortyResponseType) {
+        this.ErrortyResponseType = config.ErrortyResponseType;
+      }
+      this.errorOverrides = config.errorOverrides;
+    }
+  
     private async initializeErrorMap(): Promise<void> {
-      // Automatically map HTTP status codes to default HttpError class
+      this.initializeDefaultErrors();
+
+      if (this.errorOverrides) {
+        if (this.errorOverrides.path) {
+          await this.loadErrorsFromPath(this.errorOverrides.path);
+        }
+        if (this.errorOverrides.errors) {
+          this.loadErrorsFromArray(this.errorOverrides.errors);
+        }
+      }
+    }
+
+    private initializeErrorMapSync(): void {
+      this.initializeDefaultErrors();
+
+      if (this.errorOverrides) {
+        if (this.errorOverrides.errors) {
+          this.loadErrorsFromArray(this.errorOverrides.errors);
+        }
+        // Note: We can't load errors from path synchronously
+      }
+    }
+
+    private initializeDefaultErrors(): void {
       Object.values(HttpStatusCodes).forEach(statusCode => {
         if (typeof statusCode === 'number') {
           const errorName = `HTTP${HttpStatusCodes[statusCode]}Error`;
@@ -42,21 +111,6 @@ export class Config {
         }
       });
 
-      // Add default package errors
-      this.addDefaultErrors();
-
-      // Override with custom error classes
-      if (this.errorOverrides) {
-        if (this.errorOverrides.path) {
-          await this.loadErrorsFromPath(this.errorOverrides.path);
-        }
-        if (this.errorOverrides.errors) {
-          this.loadErrorsFromArray(this.errorOverrides.errors);
-        }
-      }
-    }
-
-    private addDefaultErrors(): void {
       const defaultErrors: Record<string, ErrorConstructor> = {
         HttpBadRequest,
         HttpConflict,
@@ -95,39 +149,9 @@ export class Config {
         });
       });
     }
-  
-    public static async getInstance(): Promise<Config> {
-      if (!Config.instance) {
-        Config.instance = new Config();
-        await Config.instance.initializeErrorMap();
-      }
-      return Config.instance;
-    }
-  
-    public static async configure(config: ErrortyConfig): Promise<void> {
-      const instance = new Config();
-      if (config.logger !== undefined) {
-        instance.logger = config.logger || new Logger();
-      }
-      if (config.showStackTrace !== undefined) {
-        instance.showStackTrace = config.showStackTrace;
-      }
-      if (config.logRequestDetails !== undefined) {
-        instance.logRequestDetails = config.logRequestDetails;
-      }
-      if (config.customErrorMap) {
-        config.customErrorMap.forEach((statusCode, errorName) => {
-          instance.addCustomError(errorName, statusCode);
-        });
-      }
-      if (config.errorOverrides) {
-        instance.errorOverrides = config.errorOverrides;
-      }
-      if (config.ErrortyResponseType) {
-        instance.ErrortyResponseType = config.ErrortyResponseType;
-      }
-      await instance.initializeErrorMap();
-      Config.instance = instance;
+
+    public isInitialized(): boolean {
+      return this.initialized;
     }
   
     public getLogger(): ILogger {
@@ -160,23 +184,4 @@ export class Config {
     public getErrortyResponseType(): ErrortyErrorResponseType {
       return this.ErrortyResponseType;
     }
-  }
-  
-  // Usage example:
-  // import { Config, ErrortyConfig } from './Config';
-  // 
-  // async function setupErrorHandling() {
-  //   const customConfig: ErrortyConfig = {
-  //     showStackTrace: process.env.NODE_ENV !== 'production',
-  //     logRequestDetails: true,
-  //     ErrortyResponseType: 'json',
-  //     errorOverrides: {
-  //       path: './customErrors',
-  //       errors: [CustomError1, CustomError2]
-  //     }
-  //   };
-  // 
-  //   await Config.configure(customConfig);
-  //   const config = await Config.getInstance();
-  //   // Use config...
-  // }
+}

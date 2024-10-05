@@ -1,7 +1,7 @@
 {
   "name": "errorty",
-  "version": "1.0.0",
-  "description": "A comprehensive error handling package for Node.js applications",
+  "version": "1.0.3",
+  "description": "A comprehensive error handling package for Express.js applications",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

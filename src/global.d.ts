@@ -7,7 +7,6 @@ interface ILogger {
   warn(message: string | object): void;
   info(message: string | object): void;
   debug(message: string | object): void;
-  fatal(message: string | object): void;
 }
 
 interface LogEntry {

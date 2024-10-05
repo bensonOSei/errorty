@@ -27,10 +27,6 @@ export class Logger implements ILogger {
       this.log(LogLevel.DEBUG, message);
     }
 
-    public fatal(message: ErrortyLogMessage): void {
-      this.log(LogLevel.FATAL, message);
-    }
-  
     private log(level: LogLevel, message: ErrortyLogMessage): void {
       if (level <= this.logLevel) {
         const logEntry = this.formatLogEntry(level, message);
