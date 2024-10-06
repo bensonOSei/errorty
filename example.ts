@@ -3,8 +3,8 @@ import { ErrorHandler } from "./src/Handler";
 import { HttpBadRequest } from "./src/errors/HttpBadRequest";
 
 ErrorHandler.initializeSync({
-  showStackTrace: true,
-  logRequestDetails: true,
+  showStackTrace: true, // process.env.NODE_ENV !== 'production',
+  logRequestDetails: true, // process.env.DEBUG === 'true',
   ErrortyResponseType: "json",
 });
 
@@ -14,7 +14,8 @@ app.get("/", (req: Request, res: Response) => {
   res.send("Hello, World!");
 });
 
-app.get("/error", (req: Request, res: Response) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.get("/error", (_req: Request, _res: Response) => {
   throw new HttpBadRequest();
 });
 

@@ -46,7 +46,8 @@ export class ErrorHandler {
     err: Error,
     req: Request,
     res: ExpressResponse,
-    next: NextFunction
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _next: NextFunction
   ): void => {
     if (!ErrorHandler.initialized) {
       console.error(
